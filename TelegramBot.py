@@ -207,7 +207,7 @@ if __name__ == "__main__":
                                 print thisGym
                                 print
                                 response = requests.post(url='https://api.telegram.org/bot{0}/{1}'.format(token, method),
-                                data={'chat_id': -196743804, 'text': thumbs + arrow + symbols[thisGym.team] + ' ' + str(thisGym),'parse_mode': 'Markdown'}).json()
+                                data={'chat_id': channelid, 'text': thumbs + arrow + symbols[thisGym.team] + ' ' + str(thisGym),'parse_mode': 'Markdown'}).json()
                     oldgym = None
                     if thisGym.name in gyms:
                         oldGym = gyms[thisGym.name]
