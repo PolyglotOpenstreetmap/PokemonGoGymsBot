@@ -4,6 +4,8 @@ from telegram.ext import Updater
 import MySQLdb
 import requests, time
 from TBcred import *
+import pytz
+local_tz = pytz.timezone('Europe/Brussels')
 
 teams={0: 'No team', 1: 'Mystic', 2: 'Valor', 3: 'Instinct'}
 symbols={0: '', 1: '💙', 2: '♥️', 3: '💛'}
@@ -74,11 +76,15 @@ class Defender:
         self.trainer = trainer
         self.pokemonid = pokemonid
         self.cp = cp
-        self.last_seen = last_seen
+        self.last_seen = str(last_seen.replace(tzinfo=pytz.utc).astimezone(local_tz))[11:19]
         self.team = team
         self.level = level
+        self.new = False
     def markup(self):
-        return '`{}`\t_{}{:>5}_ `{:<10}` *{} {}*'.format(self.last_seen,symbols[self.team],self.cp, mons[self.pokemonid], self.level, self.trainer)
+        if self.new:
+            return '`{}`\t_{}{:>5}_ `{:<10}` *{} {}*👈'.format(self.last_seen,symbols[self.team],self.cp, mons[self.pokemonid], self.level, self.trainer)
+        else:
+            return '`{}`\t_{}{:>5}_ `{:<10}` *{} {}*'.format(self.last_seen,symbols[self.team],self.cp, mons[self.pokemonid], self.level, self.trainer)
 
 class Gym:
     levels=[0, 2000, 4000, 8000, 12000, 16000, 20000, 30000, 40000, 50000]
@@ -86,24 +92,24 @@ class Gym:
     def __init__(self, name = '', prestige = 0, team=0, last_scanned=None):
         self.name = name
         self.prestige = int(prestige)
-        self.last_scanned = last_scanned 
+        self.last_scanned = str(last_scanned.replace(tzinfo=pytz.utc).astimezone(local_tz))[0:19]
         self.defenders = {}
         self.team = team
+        self.RIP = []
     def getLevel(self):
-        slots = 0
-        if self.prestige >= self.levels[-1]: return (10,0)
-        level = 9
-        for l in range(9, 0, -1):
+        if self.prestige >= self.levels[-1]: return '10 (0)'
+        level = 9; slots = 0
+        for l in range(9, 1, -1):
             print self.prestige, l, self.levels[l], self.levels[l-1]
             if self.prestige < self.levels[l] and self.prestige >= self.levels[l-1]:
                 level = l
                 slots = level - len(self.defenders)
-                if slots > 0:
-                    if self.prestige+4000 >= self.levels[l+1]: slots = 2
-                    elif self.prestige+2000 >= self.levels[l]: slots = 1
+                #if slots > 0:
+                #    if self.prestige+4000 >= self.levels[l-1]: slots += 1
+                    #elif self.prestige+2000 >= self.levels[l]: slots += 1
                 break
         
-        return str(level) + ' (' + str(slots) + ')'
+        return str(level)# + ' (' + str(slots) + ')'
     def addDefender(self, defender): 
         self.defenders[defender.trainer] = defender
     def getDefenders(self, arg):
@@ -115,10 +121,29 @@ class Gym:
         for d in self.defenders:
             cp.append(self.defenders[d].cp)
         return cp
+    def compareWithGym(self,prevGym = None):
+        if prevGym:
+            prevDefenders = prevGym.defenders.copy()
+            curDefenders  = self.defenders.copy()
+            for d in prevGym.defenders:
+                if d in curDefenders:
+                    curDefenders.pop(d)
+                    prevDefenders.pop(d)
+            if prevDefenders:
+                print prevGym.name, ' RIP: ', prevDefenders
+                for d in prevDefenders:
+                    self.RIP.append(prevGym.defenders[d])
+            for d in curDefenders:
+                self.defenders[d].new = True
+                print d
     def __str__(self):
         markup= '{} *{:<40}*{}\n`{:<40}`_{:>5}_\n\n'.format(self.getLevel(), self.name, teams[self.team], str(self.last_scanned), self.prestige)
         for d in self.sortedDefenders():
             markup+=d[1].markup() + '\n'
+        markup+='\n'
+        for d in self.RIP:
+            print d
+            markup+='💤' + d.markup() + '\n'
         return markup 
 gyms = {}
 
@@ -159,7 +184,7 @@ if __name__ == "__main__":
             print 'connection to DB failed'
             time.sleep(60)
             continue
-        print query
+        #print query
         try:
             cursor.execute (query)
         except:
@@ -174,6 +199,7 @@ if __name__ == "__main__":
                     if row[0] in gyms.keys():
                         '''Did we see this gym already in a previous query?'''
                         if thisGym.name in gyms and id(thisGym) != id(gyms[thisGym.name]):
+                            thisGym.compareWithGym(gyms[thisGym.name])
                             #print thisGym.name, id(gyms[thisGym.name]), id(thisGym),' ', id(gyms[thisGym.name]) == id(thisGym), sum(thisGym.cpDefenders())
                             #print thisGym.name, sum(gyms[thisGym.name].cpDefenders()), sum(thisGym.cpDefenders())
                             cpdifference = sum(gyms[thisGym.name].cpDefenders()) - sum(thisGym.cpDefenders())
