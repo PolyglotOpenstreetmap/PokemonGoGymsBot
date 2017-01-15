@@ -152,7 +152,9 @@ from TBconfig import *
 if __name__ == "__main__":
     prevGymname = ''
     while 1:
-        previouslyScannedGyms = gyms.keys()
+        previouslyScannedGyms = []
+        for g in gyms.keys():
+            previouslyScannedGyms.append(g.replace('"','\\"'))
         #print previouslyScannedGyms
         query = """SELECT gd.name as name, g.gym_points, g.last_scanned, gp.trainer_name, gp.last_seen,
                    pokemon_id, cp, team_id, t.team, t.level
@@ -167,7 +169,7 @@ if __name__ == "__main__":
                                 JOIN gym g1 ON  gm1.gym_id = g1.gym_id
                                 JOIN gymdetails gd1 ON gd1.gym_id = g1.gym_id 
                                 WHERE gp1.trainer_name IN ("{}"))
-            ORDER BY name;""".format('","'.join(gymsToScan + previouslyScannedGyms).replace("'","''"),
+            ORDER BY name;""".format('","'.join(list(set(gymsToScan + previouslyScannedGyms))).replace("'","''"),
                                      '","'.join(trainersOfInterest))
         try:
             conn = MySQLdb.connect (host   = DBhost,
@@ -181,14 +183,14 @@ if __name__ == "__main__":
         try:
             cursor = conn.cursor ()
         except:
-            print 'connection to DB failed'
+            print "couldn't get cursor"
             time.sleep(60)
             continue
-        #print query
+        print query
         try:
             cursor.execute (query)
         except:
-            print "couldn't get cursor"
+            print "query failed"
             time.sleep(60)
             continue
         for row in cursor.fetchall():
